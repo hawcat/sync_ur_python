@@ -17,13 +17,25 @@ import requests
 from tqdm import tqdm
 
 
+def get_pip(python_base):
+    url = "https://bootstrap.pypa.io/get-pip.py"
+
+    response = requests.get(url)
+    if response.status_code == 200:
+        with open(os.path.join(python_base, "get-pip.py"), 'wb') as file:
+            file.write(response.content)
+        print("get-pip.py downloaded successfully.")
+    else:
+        print("Failed to download get-pip.py. Status code:", response.status_code)
+
+
 def download_python_embeddable(version) -> str:
-    base_url = "https://www.python.org/ftp/python/{}/".format(version)
+    base_url = f"https://www.python.org/ftp/python/{version}/"
 
     # Construct the embeddable package URL
-    embeddable_url = "{}python-{}-embed-amd64.zip".format(base_url, version)
+    embeddable_url = f"{base_url}python-{version}-embed-amd64.zip"
 
-    # Create a temporary directory to save the downloaded file
+    # Create a directory to save the downloaded file
     temp_dir = "embeddable_packages"
     os.makedirs(temp_dir, exist_ok=True)
 
@@ -32,7 +44,7 @@ def download_python_embeddable(version) -> str:
     file_size = int(response.headers['Content-Length'])
     chunk_size = 1024
     num_bars = int(file_size / chunk_size)
-    file_path = os.path.join(temp_dir, "python-{}-embed-amd64.zip".format(version))
+    file_path = os.path.join(temp_dir, f"python-{version}-embed-amd64.zip")
 
     with open(file_path, 'wb') as fp:  # cover mode
         for chunk in tqdm(iterable=response.iter_content(chunk_size=chunk_size), total=num_bars,
@@ -61,11 +73,13 @@ def install_package(python_path, package_name, pip_args=None):
     try:
         # 使用subprocess调用系统命令安装包
         if pip_args:
-            command = f"{python_path} -m pip install {package_name} --no-warn-script-location {pip_args}"
+            command = (f"{python_path} -m pip install {package_name} --no-warn-script-location "
+                       f"{pip_args}")
             subprocess.check_call(command, shell=True)
         else:
-            subprocess.check_call(
-                [python_path, "-m", "pip", "install", package_name, "--no-warn-script-location"], shell=True)
+            command = [python_path, "-m", "pip", "install", package_name,
+                       "--no-warn-script-location"]
+            subprocess.check_call(command, shell=True)
         print(f"Package '{package_name}' installed successfully.")
     except subprocess.CalledProcessError as e:
         raise RuntimeError(f"Failed to install package '{package_name}'. Error: {e}")
@@ -97,6 +111,8 @@ def create_env(python_directory, install_version):
     version_out = os.popen(f"{python_directory}/python.exe -V")
     version_list = version_out.readline().replace(".", " ").split(" ")
     python_version = "".join(version_list[:3]).lower()
+
+    get_pip(python_directory)
 
     try:
         subprocess.run(f"{python_directory}/python.exe {python_directory}/get-pip.py", shell=True)
